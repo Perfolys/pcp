@@ -23,6 +23,7 @@ from ctypes import c_int, POINTER, cast
 import cpmapi as c_api
 from pcp.pmda import PMDA, pmdaMetric, pmdaIndom, pmdaInstid
 from pcp.pmapi import pmUnits, pmContext as PCP
+import re
 
 class SimplePMDA(PMDA):
     '''
@@ -52,6 +53,7 @@ class SimplePMDA(PMDA):
     # simple.numfetch properties
     numfetch = 0
     oldfetch = -1
+    lastfetch = 0
 
 
     def simple_instance(self, serial):
@@ -63,8 +65,17 @@ class SimplePMDA(PMDA):
 
     def simple_fetch(self):
         ''' Called once per "fetch" PDU, before callbacks '''
-        self.numfetch += 1
+        sum = 0
+        p = re.compile(r' \d+ ')
+        with open("/proc/interrupts") as search:
+            for line in search:
+                line = line.rstrip()  # remove '\n' at end of line
+                if '12:' in line:
+                    for n in p.findall(line):
+                        sum += int(n)
         self.simple_timenow_check()
+        self.numfetch = sum - self.lastfetch
+        self.lastfetch = sum
 
     def simple_fetch_color_callback(self, item, inst):
         '''
